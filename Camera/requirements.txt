@@ -1,0 +1,4 @@
+base64
+depthai
+python-socketio[client]
+websocket-client

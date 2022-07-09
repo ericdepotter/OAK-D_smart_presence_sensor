@@ -1,0 +1,7 @@
+.no-transform {
+    transform: none !important;
+}
+
+.transform-center {
+    transform-origin: center;
+}
