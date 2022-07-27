@@ -155,7 +155,7 @@ def handle_camera_update(message):
 
 
 if __name__ == '__main__':
-    socketio.run(app)
+    socketio.run(app, host='0.0.0.0')
     #threading.Thread(target=lambda: socketio.run(app)).start()
 
     #print(compute_absolute_coordinates({'x': 1, 'y': 2, 'z': 3}, [45, 0, 0]))

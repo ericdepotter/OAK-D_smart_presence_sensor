@@ -1,4 +1,5 @@
-base64
+blobconverter
 depthai
+opencv-python
 python-socketio[client]
 websocket-client

@@ -32,13 +32,13 @@ stereo = pipeline.create(dai.node.StereoDepth)
 
 xoutImage = pipeline.create(dai.node.XLinkOut)
 xoutNN = pipeline.create(dai.node.XLinkOut)
-xoutBoundingBoxDepthMapping = pipeline.create(dai.node.XLinkOut)
-xoutDepth = pipeline.create(dai.node.XLinkOut)
+#xoutBoundingBoxDepthMapping = pipeline.create(dai.node.XLinkOut)
+#xoutDepth = pipeline.create(dai.node.XLinkOut)
 
 xoutImage.setStreamName('image')
 xoutNN.setStreamName('detections')
-xoutBoundingBoxDepthMapping.setStreamName('boundingBoxDepthMapping')
-xoutDepth.setStreamName('depth')
+#xoutBoundingBoxDepthMapping.setStreamName('boundingBoxDepthMapping')
+#xoutDepth.setStreamName('depth')
 
 # Properties
 
@@ -46,6 +46,7 @@ monoLeft.setResolution(dai.MonoCameraProperties.SensorResolution.THE_400_P)
 monoLeft.setBoardSocket(dai.CameraBoardSocket.LEFT)
 monoRight.setResolution(dai.MonoCameraProperties.SensorResolution.THE_400_P)
 monoRight.setBoardSocket(dai.CameraBoardSocket.RIGHT)
+
 
 # Setting node configs
 stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
@@ -58,7 +59,7 @@ stereo.initialConfig.setMedianFilter(dai.MedianFilter.KERNEL_7x7)
 #stereo.setDepthAlign(dai.CameraBoardSocket.RGB)
 stereo.setOutputSize(monoLeft.getResolutionWidth(), monoLeft.getResolutionHeight())
 
-spatialDetectionNetwork.setBlobPath(blobconverter.from_zoo(name='mobilenet-ssd', shaves=8))
+spatialDetectionNetwork.setBlobPath(blobconverter.from_zoo(name='mobilenet-ssd', shaves=5))
 spatialDetectionNetwork.setConfidenceThreshold(0.5)
 spatialDetectionNetwork.input.setBlocking(False)
 spatialDetectionNetwork.setBoundingBoxScaleFactor(0.25)
@@ -88,10 +89,10 @@ else:
     stereo.rectifiedRight.link(xoutImage.input)
 
 spatialDetectionNetwork.out.link(xoutNN.input)
-spatialDetectionNetwork.boundingBoxMapping.link(xoutBoundingBoxDepthMapping.input)
+#spatialDetectionNetwork.boundingBoxMapping.link(xoutBoundingBoxDepthMapping.input)
 
 stereo.depth.link(spatialDetectionNetwork.inputDepth)
-spatialDetectionNetwork.passthroughDepth.link(xoutDepth.input)
+#spatialDetectionNetwork.passthroughDepth.link(xoutDepth.input)
 
 ## Websocket ##
 
@@ -103,24 +104,33 @@ camera_stream_active = True
 # def connect():
 #     sio.emit("camera-info", NAME)
 
+FPS_CAMERA = 5
+FPS_DETECTIONS = 15
+
 # Connect to device and start pipeline
 if __name__ == '__main__':
 
     with dai.Device(pipeline) as device:
         # Output queues will be used to get the rgb frames and nn data from the outputs defined above
-        previewQueue = device.getOutputQueue(name='image', maxSize=4, blocking=False)
-        detectionNNQueue = device.getOutputQueue(name='detections', maxSize=4, blocking=False)
-        xoutBoundingBoxDepthMapping = device.getOutputQueue(name='boundingBoxDepthMapping', maxSize=4, blocking=False)
-        depthQueue = device.getOutputQueue(name='depth', maxSize=4, blocking=False)
+        previewQueue = device.getOutputQueue(name='image', maxSize=1, blocking=False)
+        detectionNNQueue = device.getOutputQueue(name='detections', maxSize=1, blocking=False)
+        #xoutBoundingBoxDepthMapping = device.getOutputQueue(name='boundingBoxDepthMapping', maxSize=1, blocking=False)
+        #depthQueue = device.getOutputQueue(name='depth', maxSize=1, blocking=False)
         
         startTime = time.monotonic()
         counter = 0
         fps = 0
 
+        time_start = time.monotonic()
+        time_last_camera = time.monotonic()
+        time_last_detection = time.monotonic()
+
+        max_fps = max(FPS_CAMERA, FPS_DETECTIONS)
+
         while True:
             if not sio.connected:
                 try:
-                    sio.connect('http://127.0.0.1:5000')
+                    sio.connect('http://192.168.2.156:5000')
                 except:
                     time.sleep(5)
                     continue
@@ -148,12 +158,6 @@ if __name__ == '__main__':
             detections_filtered = []
 
             for detection in detections:
-                # Denormalize bounding box
-                x1 = int(detection.xmin * width)
-                x2 = int(detection.xmax * width)
-                y1 = int(detection.ymin * height)
-                y2 = int(detection.ymax * height)
-
                 try:
                     label = labelMap[detection.label]
                 except:
@@ -161,6 +165,12 @@ if __name__ == '__main__':
 
                 if label != 'person':
                     continue
+
+                # Denormalize bounding box
+                x1 = int(detection.xmin * width)
+                x2 = int(detection.xmax * width)
+                y1 = int(detection.ymin * height)
+                y2 = int(detection.ymax * height)
 
                 cv2.putText(frame, str(label), (x1 + 10, y1 + 20), cv2.FONT_HERSHEY_TRIPLEX, 0.5, (255, 255, 255))
                 cv2.putText(frame, '{:.2f}'.format(detection.confidence*100), (x1 + 10, y1 + 35), cv2.FONT_HERSHEY_TRIPLEX, 0.5, (255, 255, 255))
@@ -176,16 +186,23 @@ if __name__ == '__main__':
                 'name': NAME
             }
 
-            if len(detections_filtered) > 0:
-                message['detections'] = list(map(lambda det: {'x': det.spatialCoordinates.x, 'y': det.spatialCoordinates.y, 'z': det.spatialCoordinates.z}, detections_filtered))
 
-            if camera_stream_active:
+            if len(detections_filtered) > 0 and (time.monotonic() - time_last_detection) > 1.0/FPS_DETECTIONS:
+                message['detections'] = list(map(lambda det: {'x': det.spatialCoordinates.x, 'y': det.spatialCoordinates.y, 'z': det.spatialCoordinates.z}, detections_filtered))
+                time_last_detection = time.monotonic()
+
+            if camera_stream_active and (time.monotonic() - time_last_camera) > 1.0/FPS_CAMERA:
                 # Resize to original size
                 frame = cv2.resize(frame, (640, 400), interpolation=cv2.INTER_AREA)
                 cv2.putText(frame, 'NN fps: {:.2f}'.format(fps), (2, frame.shape[0] - 4), cv2.FONT_HERSHEY_TRIPLEX, 0.4, (255,255,255))
 
                 _, jpeg = cv2.imencode('.jpg', frame)
-                message['image'] = f"data:image/jpeg;base64, {base64.b64encode(jpeg.tobytes()).decode()}"
+                #message['image'] = f"data:image/jpeg;base64, {base64.b64encode(jpeg.tobytes()).decode()}"
+                #message['image'] = (b'--frame\r\n'
+                #                    b'Content-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n')
+                message['image'] = jpeg.tobytes()
+
+                time_last_camera = time.monotonic()
 
             if len(message.keys()) > 1:
                 try:
@@ -193,3 +210,8 @@ if __name__ == '__main__':
                 except Exception as e:
                     time.sleep(5)
                     continue
+
+            # Limit processing to FPS
+            time_elapsed = time.monotonic() - time_start
+            time.sleep(max(1./max_fps - time_elapsed, 0))
+            time_start = time.monotonic()
