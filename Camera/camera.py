@@ -42,11 +42,26 @@ xoutNN.setStreamName('detections')
 
 # Properties
 
+#monoLeft.setImageOrientation(dai.CameraImageOrientation.ROTATE_180_DEG) NO EFFECT
 monoLeft.setResolution(dai.MonoCameraProperties.SensorResolution.THE_400_P)
 monoLeft.setBoardSocket(dai.CameraBoardSocket.LEFT)
+#monoRight.setImageOrientation(dai.CameraImageOrientation.ROTATE_180_DEG) NO EFFECT
 monoRight.setResolution(dai.MonoCameraProperties.SensorResolution.THE_400_P)
 monoRight.setBoardSocket(dai.CameraBoardSocket.RIGHT)
 
+# Rotate images 180 degrees
+rr = dai.RotatedRect()
+rr.center.x, rr.center.y = monoLeft.getResolutionWidth() // 2, monoLeft.getResolutionHeight() // 2
+rr.size.height, rr.size.width = monoLeft.getResolutionHeight(), monoLeft.getResolutionWidth()
+rr.angle = 180
+
+manipRotateLeft = pipeline.create(dai.node.ImageManip)
+manipRotateLeft.initialConfig.setCropRotatedRect(rr, False)
+monoLeft.out.link(manipRotateLeft.inputImage)
+
+manipRotateRight = pipeline.create(dai.node.ImageManip)
+manipRotateRight.initialConfig.setCropRotatedRect(rr, False)
+monoRight.out.link(manipRotateRight.inputImage)
 
 # Setting node configs
 stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
@@ -67,8 +82,8 @@ spatialDetectionNetwork.setDepthLowerThreshold(100)
 spatialDetectionNetwork.setDepthUpperThreshold(5000)
 
 # Linking
-monoLeft.out.link(stereo.left)
-monoRight.out.link(stereo.right)
+manipRotateLeft.out.link(stereo.left)
+manipRotateRight.out.link(stereo.right)
 
 manip = pipeline.create(dai.node.ImageManip)
 # Option 1: Don't keep aspect ratio to maximize FOV
