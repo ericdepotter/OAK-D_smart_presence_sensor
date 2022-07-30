@@ -7,7 +7,7 @@ import socketio
 import time
 
 
-NAME = 'camera_1'
+ID = 'camera_1'
 
 ## DepthAI ##
 
@@ -117,7 +117,7 @@ camera_stream_active = True
 
 # @sio.event
 # def connect():
-#     sio.emit("camera-info", NAME)
+#     sio.emit("camera-info", ID)
 
 FPS_CAMERA = 5
 FPS_DETECTIONS = 15
@@ -198,7 +198,7 @@ if __name__ == '__main__':
                 detections_filtered.append(detection)
 
             message = {
-                'name': NAME
+                'id': ID
             }
 
 
