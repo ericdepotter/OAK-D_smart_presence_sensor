@@ -8,6 +8,8 @@ import time
 
 
 ID = 'camera_1'
+FLIP = False
+SERVER_URL = 'http://192.168.2.156:5000'
 
 ## DepthAI ##
 
@@ -50,18 +52,25 @@ monoRight.setResolution(dai.MonoCameraProperties.SensorResolution.THE_400_P)
 monoRight.setBoardSocket(dai.CameraBoardSocket.RIGHT)
 
 # Rotate images 180 degrees
-rr = dai.RotatedRect()
-rr.center.x, rr.center.y = monoLeft.getResolutionWidth() // 2, monoLeft.getResolutionHeight() // 2
-rr.size.height, rr.size.width = monoLeft.getResolutionHeight(), monoLeft.getResolutionWidth()
-rr.angle = 180
+stereo_left_in = monoLeft
+stereo_right_in = monoRight
 
-manipRotateLeft = pipeline.create(dai.node.ImageManip)
-manipRotateLeft.initialConfig.setCropRotatedRect(rr, False)
-monoLeft.out.link(manipRotateLeft.inputImage)
+if (FLIP):
+    rr = dai.RotatedRect()
+    rr.center.x, rr.center.y = monoLeft.getResolutionWidth() // 2, monoLeft.getResolutionHeight() // 2
+    rr.size.height, rr.size.width = monoLeft.getResolutionHeight(), monoLeft.getResolutionWidth()
+    rr.angle = 180
 
-manipRotateRight = pipeline.create(dai.node.ImageManip)
-manipRotateRight.initialConfig.setCropRotatedRect(rr, False)
-monoRight.out.link(manipRotateRight.inputImage)
+    manipRotateLeft = pipeline.create(dai.node.ImageManip)
+    manipRotateLeft.initialConfig.setCropRotatedRect(rr, False)
+    monoLeft.out.link(manipRotateLeft.inputImage)
+
+    manipRotateRight = pipeline.create(dai.node.ImageManip)
+    manipRotateRight.initialConfig.setCropRotatedRect(rr, False)
+    monoRight.out.link(manipRotateRight.inputImage)
+
+    stereo_left_in = manipRotateLeft
+    stereo_right_in = manipRotateRight
 
 # Setting node configs
 stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
@@ -82,8 +91,8 @@ spatialDetectionNetwork.setDepthLowerThreshold(100)
 spatialDetectionNetwork.setDepthUpperThreshold(5000)
 
 # Linking
-manipRotateLeft.out.link(stereo.left)
-manipRotateRight.out.link(stereo.right)
+stereo_left_in.out.link(stereo.left)
+stereo_right_in.out.link(stereo.right)
 
 manip = pipeline.create(dai.node.ImageManip)
 # Option 1: Don't keep aspect ratio to maximize FOV
@@ -145,7 +154,7 @@ if __name__ == '__main__':
         while True:
             if not sio.connected:
                 try:
-                    sio.connect('http://192.168.2.156:5000')
+                    sio.connect(SERVER_URL)
                 except:
                     time.sleep(5)
                     continue

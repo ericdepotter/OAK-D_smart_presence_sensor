@@ -1,12 +1,13 @@
 import { ApiContext } from '../../App';
 import L from 'leaflet';
+import 'leaflet-rotatedmarker';
 import { Marker, Popup } from "react-leaflet";
-import React, { useCallback, useContext, useMemo, useRef, useState } from "react";
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 const iconCamera = new L.Icon({
     iconUrl: 'img/camera.png',
     iconRetinaUrl: 'img/camera.png',
-    iconAnchor: null,
+    iconAnchor: [null],
     popupAnchor: [0, -30],
     shadowUrl: null,
     shadowSize: null,
@@ -16,9 +17,19 @@ const iconCamera = new L.Icon({
 
 function Camera(props) {
     const api = useContext(ApiContext);
+    const { camera } = props;
+
     const [draggable, setDraggable] = useState(false);
-    const [position, setPosition] = useState(props.camera.position);
+    const [position, setPosition] = useState(camera.position);
     const markerRef = useRef(null);
+    
+    useEffect(() => {
+        const marker = markerRef.current;
+        if (marker) {
+            marker.setRotationAngle(camera.rotation[0]);
+            marker.setRotationOrigin('5px 24px');
+        }
+    }, [camera]);
 
     const eventHandlers = useMemo(
         () => ({
@@ -35,19 +46,21 @@ function Camera(props) {
     const startEditing = useCallback(() => {
         setDraggable(true);
     }, []);
+
+    console.log(camera.rotation[0]);
     
     const save = useCallback(() => {
         const marker = markerRef.current;
         if (marker != null) {
-            props.camera.position = marker.getLatLng();
+            camera.position = marker.getLatLng();
 
-            fetch(api.endpoint_api + '/camera/' + props.camera.id, {
+            fetch(api.endpoint_api + '/camera/' + camera.id, {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json',
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(props.camera)
+                body: JSON.stringify(camera)
             });
         }
         
