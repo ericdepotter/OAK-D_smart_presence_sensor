@@ -140,8 +140,8 @@ def camera(camera_id):
         data = request.json # a multidict containing POST data
 
         execute_query("UPDATE cameras SET lat = {}, lng = {}, yaw = {}, pitch = {}, roll = {} WHERE id = '{}'".format(
-            data['position']['lat'],
-            data['position']['lng'],
+            data['position'][0],
+            data['position'][1],
             data['rotation'][0],
             data['rotation'][1],
             data['rotation'][2],

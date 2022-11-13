@@ -1,20 +1,20 @@
-import { ApiContext } from '../../App';
+import { CameraContext } from '../../App';
 import Camera from './Camera';
-import React, { useContext, useState, useEffect } from "react";
+import React, { useContext } from "react";
+import { cloneDeep } from 'lodash';
 
 function Cameras() {
-  const api = useContext(ApiContext);
-  const [cameras, setCameras] = useState([]);
+  const {cameraContext, setCameraContext} = useContext(CameraContext);
 
-  useEffect(() => {
-    fetch(api.endpoint_api + '/camera_config').then(res => res.json()).then(data => {
-        setCameras(data);
-    });
-  }, []);
+  const handlePositionUpdate = (cameraId, position) => {
+    const updated = cloneDeep(cameraContext);
+    updated[cameraId].position = position;
+    setCameraContext(updated);
+  };
 
-  return cameras.map(
+  return cameraContext && Object.values(cameraContext).map(
     (c, idx) => (
-        <Camera camera={c} key={idx}/>
+        <Camera camera={c} onPositionUpdate={handlePositionUpdate} key={idx}/>
     )
   );
 }

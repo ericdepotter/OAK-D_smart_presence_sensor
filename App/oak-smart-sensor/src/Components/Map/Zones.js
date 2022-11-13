@@ -24,8 +24,6 @@ function Zones(props) {
     return () => socket.disconnect();
   }, []);
 
-  //console.log(new Date(), zonesOcuppancy, zonesOcuppancy["living"] > 0);
-
   return Object.keys(zones).map(
     (name, idx) => (
         <PolygonWithText

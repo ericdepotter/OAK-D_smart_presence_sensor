@@ -1,4 +1,4 @@
-import { ApiContext } from "../App";
+import { ApiContext } from "../../App";
 import React, { useContext, useState, useEffect } from "react";
 import socketIOClient from "socket.io-client";
 
@@ -15,7 +15,7 @@ function arrayBufferToBase64(buffer) {
 
 function CameraStream() {
   const api = useContext(ApiContext);
-  const [image, setImage] = useState("");
+  const [image, setImage] = useState("img/video-placeholder.jpg");
 
   useEffect(() => {
     const socket = socketIOClient(api.endpoint_ws);
@@ -26,10 +26,10 @@ function CameraStream() {
 
     // CLEAN UP THE EFFECT
     return () => socket.disconnect();
-  }, []);
+  }, [api.endpoint_ws]);
 
   return (
-    <img src={image} style={{width: "100%"}}/>
+    <img src={image} style={{width: "95%"}}/>
   );
 }
 
